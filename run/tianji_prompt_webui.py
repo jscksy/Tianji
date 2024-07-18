@@ -2,10 +2,14 @@ import gradio as gr
 import json
 import random
 from dotenv import load_dotenv
+from langchain.chains import LLMChain
+from langchain_community.chat_models import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+
 load_dotenv()
 from zhipuai import ZhipuAI
 import os
-file_path = 'tianji/prompt/yiyan_prompt/all_yiyan_prompt.json'
+file_path = 'D:/LLM/Tianji/tianji/prompt/yiyan_prompt/all_yiyan_prompt.json'
 API_KEY = os.environ['ZHIPUAI_API_KEY']
 CHOICES = ["敬酒","请客","送礼","送祝福","人际交流","化解尴尬","矛盾应对"]
 
@@ -92,17 +96,42 @@ def respond(system_prompt, message, chat_history):
     # 合并消息和聊天历史
     message1 = combine_message_and_history(message, chat_history)
     print(message1)
-    client = ZhipuAI(api_key=API_KEY)
-    response = client.chat.completions.create(
-        model="glm-4",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message1}
-        ],
-    )
-    
+
+    #调用智谱大模型回复
+    # client = ZhipuAI(api_key=API_KEY)
+    # response = client.chat.completions.create(
+    #     model="glm-4",
+    #     messages=[
+    #         {"role": "system", "content": system_prompt},
+    #         {"role": "user", "content": message1}
+    #     ],
+    # )
+    #
+
+    #调用OPENAI回复
+    openai_api_key = os.getenv('OPENAI_API_KEY')
+    base_url = os.getenv('OPENAI_API_BASE')
+    prompt_template = ChatPromptTemplate.from_messages([
+        ("system", "{system_prompt}"),
+        ("user", "{message}")
+    ])
+
+    llm = ChatOpenAI(temperature=0.1,
+                     api_key=openai_api_key,
+                     base_url=base_url)
+
+    chain = LLMChain(llm=llm, prompt=prompt_template, verbose=True)
+    output = chain.run({
+        "system_prompt": system_prompt,
+        "message": message1
+        })
+    # output = llm.invoke(message1)
+
+    print(output)
+
     # 提取模型生成的回复内容
-    bot_message_text = response.choices[0].message.content 
+    # bot_message_text = response.choices[0].message.content
+    bot_message_text = output;
     # 更新聊天历史
     chat_history.append([message,bot_message_text])  # 用户的消息
 
@@ -155,7 +184,7 @@ with gr.Blocks() as demo:
             submit = gr.Button('发送').click(respond, inputs=[system_prompt,msg, chatbot], outputs=[msg, chatbot])
             with gr.Row():
                 clear = gr.Button('记录删除').click(clear_history, inputs=[chatbot], outputs=[chatbot])
-                regenerate = gr.Button('重新生成').click(regenerate, inputs=[chatbot,system_prompt], outputs = [msg, chatbot])    
+                regenerate = gr.Button('重新生成').click(regenerate, inputs=[chatbot,system_prompt], outputs = [msg, chatbot])
 
     cls_choose.change(fn=cls_choose_change,inputs=cls_choose,outputs=[now_json_data,dorpdown_name])
     dorpdown_name.change(fn=change_example,inputs = [dorpdown_name,now_json_data,chatbot], outputs=[input_example,chat_history])
