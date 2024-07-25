@@ -9,9 +9,10 @@ from langchain_core.prompts import ChatPromptTemplate
 load_dotenv()
 from zhipuai import ZhipuAI
 import os
-file_path = 'D:/LLM/Tianji/tianji/prompt/yiyan_prompt/all_yiyan_prompt.json'
+file_path = 'D:/LLM/Tianji/tianji/prompt/yiyan_prompt/goldenChatBot_prompt.json'
 API_KEY = os.environ['ZHIPUAI_API_KEY']
-CHOICES = ["敬酒","请客","送礼","送祝福","人际交流","化解尴尬","矛盾应对"]
+# CHOICES = ["敬酒","请客","送礼","送祝福","人际交流","化解尴尬","矛盾应对","黄金屋"]
+CHOICES = ["黄金屋"]
 
 with open(file_path, 'r', encoding='utf-8') as file:
     json_data = json.load(file)
@@ -59,14 +60,22 @@ def random_button_click(chatbot):
 
 def example_click(dataset,name,now_json):
     system = ""
+    background = ""
+    start = ""
+    event = ""
+    end = ""
     for i in now_json:
         if i['name'] == name:
             system = i['system_prompt']
+            background = i['example'][dataset]['input']['background']
+            start = i['example'][dataset]['input']['start']
+            event = i['example'][dataset]['input']['event']
+            end = i['example'][dataset]['input']['end']
 
     if system_prompt =="":
         print(name,now_json)
         raise '遇到代码问题，清重新选择场景'
-    return dataset[0], system
+    return background,start,event,end, system
 
 def _get_id_json_id(idx):
     now_id = idx +1 # index + 1 
@@ -110,7 +119,7 @@ def respond(system_prompt, message, chat_history):
 
     #调用OPENAI回复
     openai_api_key = os.getenv('OPENAI_API_KEY')
-    base_url = os.getenv('OPENAI_API_BASE')
+    base_url = os.getenv('OPENAI_BASE_URL')
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", "{system_prompt}"),
         ("user", "{message}")
@@ -138,6 +147,50 @@ def respond(system_prompt, message, chat_history):
     return "", chat_history
 
 
+def goldenRespond(system_prompt, msgBackground,msgStart,msgEvent,msgEnd, chat_history):
+
+    #调用智谱大模型回复
+    # client = ZhipuAI(api_key=API_KEY)
+    # response = client.chat.completions.create(
+    #     model="glm-4",
+    #     messages=[
+    #         {"role": "system", "content": system_prompt},
+    #         {"role": "user", "content": message1}
+    #     ],
+    # )
+    #
+
+    #调用OPENAI回复
+    openai_api_key = os.getenv('OPENAI_API_KEY')
+    base_url = os.getenv('OPENAI_BASE_URL')
+    prompt_template = ChatPromptTemplate.from_messages([
+        ("system", "{system_prompt}"),
+        ("user", "{message}")
+    ])
+
+    info = "故事背景：" + msgBackground + '\n' + "故事开头：" + msgStart + '\n'+\
+           "故事事件：" + msgStart + '\n' + "故事结尾：" + msgEnd + '\n';
+
+    llm = ChatOpenAI(temperature=0.1,
+                     api_key=openai_api_key,
+                     base_url=base_url)
+
+    chain = LLMChain(llm=llm, prompt=prompt_template, verbose=True)
+    output = chain.run({
+        "system_prompt": system_prompt,
+        "message": info
+        })
+    # output = llm.invoke(message1)
+
+    print(output)
+
+    # 提取模型生成的回复内容
+    # bot_message_text = response.choices[0].message.content
+    bot_message_text = output;
+    chat_history.append([info, bot_message_text])
+
+    return "","","","",chat_history
+
 def clear_history(chat_history):
     chat_history.clear()
     return chat_history
@@ -154,10 +207,9 @@ def regenerate(chat_history,system_prompt):
     return msg, chat_history
 
 TITLE = """
-# Tianji 人情世故大模型系统——prompt版 欢迎star🤗！\n 
+# GoldenChatBot 黄金屋小说章节纲要生成助手！\n 
 ## 🤖感谢[智谱AI](https://www.zhipuai.cn/)的token支持！
-## 开源项目地址：https://github.com/SocialAI-tianji/Tianji
-## 使用方法：选择或随机一个场景，输入提示词（或者点击上面的Example自动填充），随后发送！
+## 使用方法：选择一个场景，输入提示词（或者点击上面的Example自动填充），随后发送！
 ### 我们的愿景是构建一个从数据收集开始的大模型全栈垂直领域开源实践。\n
 ### 我们还有其他体验应用：知识库、agent、大模型微调，欢迎体验！更欢迎你的贡献！祝大家龙年快乐！
 """
@@ -168,28 +220,35 @@ with gr.Blocks() as demo:
     now_name = gr.State()
     gr.Markdown(TITLE)
     cls_choose = gr.Radio(label="请选择任务大类",choices=CHOICES,type="index",value="敬酒") 
-    input_example = gr.Dataset(components=["text","text"],samples=[
+    input_example = gr.Dataset(components=["text","text"],type = "index",
+                    samples=[
                     ["请先选择合适的场景","请先选择合适的场景"],
                     ])
     with gr.Row():
         with gr.Column(scale=1):
             dorpdown_name = gr.Dropdown(choices=get_names_by_id(1),label='场景', info='请选择合适的场景',interactive=True)
             system_prompt = gr.TextArea(label='系统提示词') #TODO 需要给初始值嘛？包括example
-            random_button = gr.Button('🪄点我随机一个试试！',size='lg')
+            # random_button = gr.Button('🪄点我随机一个试试！',size='lg')
             dorpdown_name.change(fn=get_system_prompt_by_name, inputs=[dorpdown_name], outputs=[system_prompt])
         with gr.Column(scale=4):
-            chatbot = gr.Chatbot(label='聊天界面', value=[['如果喜欢，请给我们一个⭐，谢谢', "不知道选哪个？试试点击随机按钮把！"]])
-            msg = gr.Textbox(label="输入信息")
-            msg.submit(respond, inputs=[system_prompt,msg, chatbot], outputs=[msg, chatbot])
-            submit = gr.Button('发送').click(respond, inputs=[system_prompt,msg, chatbot], outputs=[msg, chatbot])
+            chatbot = gr.Chatbot(label='聊天界面', value=[['如果喜欢，请给我们一个⭐，谢谢']])
+            with gr.Row():
+                msgBackground = gr.TextArea(label="简要背景")
+                # msg.submit(respond, inputs=[system_prompt,msg, chatbot], outputs=[msg, chatbot])
+                msgStart = gr.TextArea(label="故事开始")
+                msgEvent = gr.TextArea(label="章节事件")
+                msgEnd = gr.TextArea(label="故事结尾")
+            submit = gr.Button('发送').click(goldenRespond, inputs=[system_prompt,
+                                    msgBackground,msgStart,msgEvent,msgEnd,chatbot]
+                                           , outputs=[msgBackground,msgStart,msgEvent,msgEnd, chatbot])
             with gr.Row():
                 clear = gr.Button('记录删除').click(clear_history, inputs=[chatbot], outputs=[chatbot])
-                regenerate = gr.Button('重新生成').click(regenerate, inputs=[chatbot,system_prompt], outputs = [msg, chatbot])
+                # regenerate = gr.Button('重新生成').click(regenerate, inputs=[chatbot,system_prompt], outputs = [msg, chatbot])
 
     cls_choose.change(fn=cls_choose_change,inputs=cls_choose,outputs=[now_json_data,dorpdown_name])
     dorpdown_name.change(fn=change_example,inputs = [dorpdown_name,now_json_data,chatbot], outputs=[input_example,chat_history])
-    input_example.click(fn=example_click, inputs=[input_example,dorpdown_name,now_json_data],outputs=[msg,system_prompt] )
-    random_button.click(fn=random_button_click,inputs=chatbot,outputs=[cls_choose,now_json_data,dorpdown_name])
+    input_example.click(fn=example_click, inputs=[input_example,dorpdown_name,now_json_data],outputs=[msgBackground,msgStart,msgEvent,msgEnd,system_prompt] )
+    # random_button.click(fn=random_button_click,inputs=chatbot,outputs=[cls_choose,now_json_data,dorpdown_name])
 
 if __name__ == "__main__":
     demo.launch()
