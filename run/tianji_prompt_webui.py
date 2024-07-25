@@ -11,7 +11,7 @@ from zhipuai import ZhipuAI
 import os
 file_path = 'D:/LLM/Tianji/tianji/prompt/yiyan_prompt/goldenChatBot_prompt.json'
 API_KEY = os.environ['ZHIPUAI_API_KEY']
-# CHOICES = ["敬酒","请客","送礼","送祝福","人际交流","化解尴尬","矛盾应对","黄金屋"]
+# CHOICES = ["敬酒","请客","送礼","送祝福","人际交流","化解尴 尬","矛盾应对","黄金屋"]
 CHOICES = ["黄金屋"]
 
 with open(file_path, 'r', encoding='utf-8') as file:
@@ -231,7 +231,7 @@ with gr.Blocks() as demo:
             # random_button = gr.Button('🪄点我随机一个试试！',size='lg')
             dorpdown_name.change(fn=get_system_prompt_by_name, inputs=[dorpdown_name], outputs=[system_prompt])
         with gr.Column(scale=4):
-            chatbot = gr.Chatbot(label='聊天界面', value=[['如果喜欢，请给我们一个⭐，谢谢']])
+            chatbot = gr.Chatbot(label='聊天界面', value=[['如果喜欢，请给我们一个⭐，谢谢','请补充完小说设定后点击发送']])
             with gr.Row():
                 msgBackground = gr.TextArea(label="简要背景")
                 # msg.submit(respond, inputs=[system_prompt,msg, chatbot], outputs=[msg, chatbot])
